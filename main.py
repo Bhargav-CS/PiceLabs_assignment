@@ -1,6 +1,5 @@
 import requests
 import csv
-import argparse
 import json
 
 def fetch_data(body):
@@ -31,56 +30,74 @@ def fetch_data(body):
         "x-booking-topic": "capla_browser_b-search-web-searchresults"
     }
 
-    response = requests.post(url, headers=headers, data=body)
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = requests.post(url, headers=headers, data=body)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while fetching data: {e}")
+        return None
 
 def extract_body():
     """Extract the body from the Postman collection"""
     
-    with open('PL_SDE_Code_Test.postman_collection.json', 'r') as file:
-        data = json.load(file)
-    
-    for item in data['item']:
-        if 'request' in item:
-            return item['request']['body']['raw']
+    try:
+        with open('PL_SDE_Code_Test.postman_collection.json', 'r') as file:
+            data = json.load(file)
+        
+        for item in data['item']:
+            if 'request' in item:
+                return item['request']['body']['raw']
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"An error occurred while extracting the body: {e}")
+        return None
 
 def configure_body(body, checkin_date, checkout_date, address, lat, lon, page_size):
     """Configure the body with the required parameters"""
     
-    
-    body = json.loads(body)
-    body['variables']['input']['dates']['checkin'] = checkin_date
-    body['variables']['input']['dates']['checkout'] = checkout_date
-    body['variables']['input']['location']['searchString'] = address
-    body['variables']['input']['location']['latitude'] = lat
-    body['variables']['input']['location']['longitude'] = lon
-    body['variables']['input']['pagination']['rowsPerPage'] = page_size
-    return json.dumps(body)
+    try:
+        body = json.loads(body)
+        body['variables']['input']['dates']['checkin'] = checkin_date
+        body['variables']['input']['dates']['checkout'] = checkout_date
+        body['variables']['input']['location']['searchString'] = address
+        body['variables']['input']['location']['latitude'] = lat
+        body['variables']['input']['location']['longitude'] = lon
+        body['variables']['input']['pagination']['rowsPerPage'] = page_size
+        return json.dumps(body)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"An error occurred while configuring the body: {e}")
+        return None
 
 def parse_listings(data):
     """Parse the listings data and return a list of parsed data"""
     
-    listings = data['data']['searchQueries']['search']['results']
-    parsed_data = []
-    base_url = "https://www.booking.com/hotel/in/" # Replace with appropriate country code
-    for listing in listings:
-        listing_id = listing['basicPropertyData']['id']
-        listing_title = listing['displayName']['text']
-        page_name = listing['basicPropertyData']['pageName']
-        amount_per_stay = listing['priceDisplayInfoIrene']['displayPrice']['amountPerStay']['amount'].lstrip("US")
-        listing_url = f"{base_url}{page_name}.html"
-        parsed_data.append([listing_id, listing_title, page_name, amount_per_stay, listing_url])
-    return parsed_data
+    try:
+        listings = data['data']['searchQueries']['search']['results']
+        parsed_data = []
+        base_url = "https://www.booking.com/hotel/in/" # Replace with appropriate country code
+        for listing in listings:
+            listing_id = listing['basicPropertyData']['id']
+            listing_title = listing['displayName']['text']
+            page_name = listing['basicPropertyData']['pageName']
+            amount_per_stay = listing['priceDisplayInfoIrene']['displayPrice']['amountPerStay']['amount'].lstrip("US")
+            listing_url = f"{base_url}{page_name}.html"
+            parsed_data.append([listing_id, listing_title, page_name, amount_per_stay, listing_url])
+        return parsed_data
+    except (KeyError, TypeError) as e:
+        print(f"An error occurred while parsing the listings: {e}")
+        return []
 
 def write_to_csv(data, filename="listings.csv"):
     """Write the parsed data to a CSV file"""
     
     headers = ["Listing ID", "Listing Title", "Page Name", "Amount Per Stay", "Listing URL"]
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(headers)
-        writer.writerows(data)
+    try:
+        with open(filename, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headers)
+            writer.writerows(data)
+    except IOError as e:
+        print(f"An error occurred while writing to CSV: {e}")
 
 def main():
     # Hardcoded values for testing
@@ -88,11 +105,40 @@ def main():
     lat = 18.516726
     lon = 73.856255
     page_size = 50
+    checkin_date = "2025-01-01"
+    checkout_date = "2025-01-02"
     body = extract_body()
-    body = configure_body(body, "2025-01-01", "2025-01-02", address, lat, lon, page_size)
-    data = fetch_data(body)
-    parsed_data = parse_listings(data)
-    write_to_csv(parsed_data)
+    if body:
+        body = configure_body(body, checkin_date, checkout_date, address, lat, lon, page_size)
+        if body:
+            data = fetch_data(body)
+            if data:
+                parsed_data = parse_listings(data)
+                write_to_csv(parsed_data)
+                
+                
+def app_flask(params):
+    address = str(params['address'])
+    lat = float(params['lat'])
+    lon = float(params['lon'])
+    page_size = int(params['page_size'])
+    checkin_date = str(params['checkin_date'])
+    checkout_date = str(params['checkout_date'])
+    body = extract_body()
+    if body:
+        body = configure_body(body, checkin_date, checkout_date, address, lat, lon, page_size)
+        if body:
+            data = fetch_data(body)
+            if data:
+                parsed_data = parse_listings(data)
+                write_to_csv(parsed_data)
+                return parsed_data
+            else:
+                return None
+        else:
+            return None
+    else:
+        return None
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

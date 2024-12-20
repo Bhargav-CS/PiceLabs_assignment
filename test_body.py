@@ -1,5 +1,5 @@
 import requests
-from test_api_query import body
+import json
 
 url = "https://www.booking.com/dml/graphql"
 headers = {
@@ -28,7 +28,16 @@ headers = {
 
 
 
-response = requests.post(url, headers=headers, data=body)
+# response = requests.post(url, headers=headers, data=body)
 
-with open('response.json', 'w') as file:
-    file.write(response.text)
+# with open('response.json', 'w') as file:
+#     file.write(response.text)
+
+# with open('PL_SDE_Code_Test.postman_collection.json', 'r') as file:
+#         data = json.load(file)
+        
+#         headers = data['item'][0]['request']['header']
+#         for ele in headers:
+#             print(ele)
+            
+#         print(headers)
